@@ -9,9 +9,12 @@
     <h1>Record Audio</h1>
     <button id="recordButton">Record</button>
     <button id="stopButton" disabled>Stop</button>
+    <button id="playButton" disabled>Play</button>
+    <audio id="audioPlayback" controls></audio>
     <script>
         let mediaRecorder;
         let audioChunks = [];
+        let audioBlob;
 
         document.getElementById('recordButton').onclick = async () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -23,7 +26,7 @@
             };
 
             mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
                 const formData = new FormData();
                 formData.append('audio_data', audioBlob, 'recording.wav');
 
@@ -32,7 +35,11 @@
                     body: formData
                 });
 
+                const audioUrl = URL.createObjectURL(audioBlob);
+                document.getElementById('audioPlayback').src = audioUrl;
+
                 audioChunks = [];
+                document.getElementById('playButton').disabled = false;
             };
 
             document.getElementById('recordButton').disabled = true;
@@ -43,6 +50,10 @@
             mediaRecorder.stop();
             document.getElementById('recordButton').disabled = false;
             document.getElementById('stopButton').disabled = true;
+        };
+
+        document.getElementById('playButton').onclick = () => {
+            document.getElementById('audioPlayback').play();
         };
     </script>
 </body>
