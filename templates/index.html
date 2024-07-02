@@ -11,6 +11,7 @@
     <button id="stopButton" disabled>Stop</button>
     <button id="playButton" disabled>Play</button>
     <audio id="audioPlayback" controls></audio>
+    <p id="transcription"></p>
     <script>
         let mediaRecorder;
         let audioChunks = [];
@@ -30,10 +31,13 @@
                 const formData = new FormData();
                 formData.append('audio_data', audioBlob, 'recording.wav');
 
-                await fetch('/upload', {
+                const response = await fetch('/upload', {
                     method: 'POST',
                     body: formData
                 });
+
+                const result = await response.json();
+                document.getElementById('transcription').innerText = result.transcription;
 
                 const audioUrl = URL.createObjectURL(audioBlob);
                 document.getElementById('audioPlayback').src = audioUrl;
