@@ -7,106 +7,99 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-4">
-        <div id="tests">
-            <div class="d-flex flex-wrap justify-content-between justify-content-center">
-                {% for i in range(5) %}
-                    <div class="test">
-                        <div class="card">
-                            <div class="card-body">
-                                <div class="d-flex flex-row">
-                                    <h1 class="card-title text-center">Record Audio</h5>
-                                    <hr>
-                                    <p class="text-center">Expected letter {{ i+1}}: <span id="expectedLetter" style="font-size: 2em; font-weight: bold;">{{ expected_letters[i] }}</span></p>
-                                    <div class="m-2">
-                                        <audio id="audioPlayback" controls></audio>
-                                    </div>
-                                    <button class="btn btn-primary m-2" id="recordButton">Record</button>
-                                    <button class="btn btn-primary m-2" id="stopButton" disabled>Stop</button>
-                                    <button class="btn btn-danger m-2" id="playButton" disabled>Play</button>
-                                    <hr>
-                                    <h3 class="card-title text-center">Spoken Text</h3>
-                                    <p class="text-center text-wrap" id="transcription"></p>
-                                    <p class="text-center" id="score"></p>
-                                </div>
-                            </div>
-                        </div>
+    <div class="container mt-5">
+        <h1 class="text-center">Record Audio</h1>
+        <div id="tests" class="row">
+            {% for i in range(5) %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <p>Expected letter {{ i+1 }}: <span class="expectedLetter" style="font-size: 2em; font-weight: bold;">{{ expected_letters[i] }}</span></p>
+                        <button class="btn btn-primary recordButton" data-index="{{ i }}">Record</button>
+                        <button class="btn btn-secondary stopButton" data-index="{{ i }}" disabled>Stop</button>
+                        <button class="btn btn-info playButton" data-index="{{ i }}" disabled>Play</button>
+                        <audio class="audioPlayback mt-3 w-100" controls></audio>
+                        <p class="transcription mt-2"></p>
                     </div>
-                {% endfor %}
+                </div>
             </div>
-            
+            {% endfor %}
         </div>
-        <p id="totalScore"></p>
-        <button id="submitButton" disabled>Submit</button>
+        <div class="text-center">
+            <p id="totalScore" class="font-weight-bold"></p>
+            <button id="submitButton" class="btn btn-success" disabled>Submit</button>
+        </div>
     </div>
-        <script>
-            let mediaRecorders = [];
-            let audioChunks = Array.from({ length: 5 }, () => []);
-            let audioBlobs = [];
+    <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
+    <script>
+        let mediaRecorders = [];
+        let audioChunks = Array.from({ length: 5 }, () => []);
+        let audioBlobs = [];
 
-            document.querySelectorAll('.recordButton').forEach((button, index) => {
-                button.onclick = async () => {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorders[index] = new MediaRecorder(stream);
-                    mediaRecorders[index].start();
+        document.querySelectorAll('.recordButton').forEach((button, index) => {
+            button.onclick = async () => {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorders[index] = new MediaRecorder(stream);
+                mediaRecorders[index].start();
 
-                    mediaRecorders[index].ondataavailable = event => {
-                        audioChunks[index].push(event.data);
-                    };
-
-                    mediaRecorders[index].onstop = () => {
-                        audioBlobs[index] = new Blob(audioChunks[index], { type: 'audio/wav' });
-                        const audioUrl = URL.createObjectURL(audioBlobs[index]);
-                        document.querySelectorAll('.audioPlayback')[index].src = audioUrl;
-
-                        audioChunks[index] = [];
-                        document.querySelectorAll('.playButton')[index].disabled = false;
-                        checkAllRecorded();
-                    };
-
-                    button.disabled = true;
-                    document.querySelectorAll('.stopButton')[index].disabled = false;
+                mediaRecorders[index].ondataavailable = event => {
+                    audioChunks[index].push(event.data);
                 };
-            });
 
-            document.querySelectorAll('.stopButton').forEach((button, index) => {
-                button.onclick = () => {
-                    mediaRecorders[index].stop();
-                    document.querySelectorAll('.recordButton')[index].disabled = false;
-                    button.disabled = true;
+                mediaRecorders[index].onstop = () => {
+                    audioBlobs[index] = new Blob(audioChunks[index], { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlobs[index]);
+                    document.querySelectorAll('.audioPlayback')[index].src = audioUrl;
+
+                    audioChunks[index] = [];
+                    document.querySelectorAll('.playButton')[index].disabled = false;
+                    checkAllRecorded();
                 };
-            });
 
-            document.querySelectorAll('.playButton').forEach((button, index) => {
-                button.onclick = () => {
-                    document.querySelectorAll('.audioPlayback')[index].play();
-                };
-            });
-
-            function checkAllRecorded() {
-                const allRecorded = audioBlobs.length === 5 && audioBlobs.every(blob => blob);
-                document.getElementById('submitButton').disabled = !allRecorded;
-            }
-
-            document.getElementById('submitButton').onclick = async () => {
-                const formData = new FormData();
-                document.querySelectorAll('.expectedLetter').forEach((span, index) => {
-                    formData.append('expected_letters[]', span.innerText);
-                    formData.append(`audio_data_${index}`, audioBlobs[index], `recording_${index}.wav`);
-                });
-
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                result.transcriptions.forEach((transcription, index) => {
-                    document.querySelectorAll('.transcription')[index].innerText = "Spoken letter: " + transcription;
-                });
-                document.getElementById('totalScore').innerText = "Total score: " + result.total_score;
+                button.disabled = true;
+                document.querySelectorAll('.stopButton')[index].disabled = false;
             };
-        </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"/>
+        });
+
+        document.querySelectorAll('.stopButton').forEach((button, index) => {
+            button.onclick = () => {
+                mediaRecorders[index].stop();
+                document.querySelectorAll('.recordButton')[index].disabled = false;
+                button.disabled = true;
+            };
+        });
+
+        document.querySelectorAll('.playButton').forEach((button, index) => {
+            button.onclick = () => {
+                document.querySelectorAll('.audioPlayback')[index].play();
+            };
+        });
+
+        function checkAllRecorded() {
+            const allRecorded = audioBlobs.length === 5 && audioBlobs.every(blob => blob);
+            document.getElementById('submitButton').disabled = !allRecorded;
+        }
+
+        document.getElementById('submitButton').onclick = async () => {
+            const formData = new FormData();
+            document.querySelectorAll('.expectedLetter').forEach((span, index) => {
+                formData.append('expected_letters[]', span.innerText);
+                formData.append(`audio_data_${index}`, audioBlobs[index], `recording_${index}.wav`);
+            });
+
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            result.transcriptions.forEach((transcription, index) => {
+                document.querySelectorAll('.transcription')[index].innerText = "Spoken letter: " + transcription;
+            });
+            document.getElementById('totalScore').innerText = "Total score: " + result.total_score;
+        };
+    </script>
 </body>
 </html>
