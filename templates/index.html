@@ -12,6 +12,8 @@
             <div class="card-body">
                 <div class="d-flex flex-column">
                     <h1 class="card-title text-center">Record Audio</h5>
+                    <hr>
+                    <p class="text-center">Expected letter: <span id="expectedLetter" style="font-size: 2em; font-weight: bold;">{{ expected_letter }}</span></p>
                     <div class="m-2">
                         <audio id="audioPlayback" controls></audio>
                     </div>
@@ -21,58 +23,62 @@
                     <hr>
                     <h3 class="card-title text-center">Spoken Text</h3>
                     <p class="text-center text-wrap" id="transcription"></p>
+                    <p class="text-center" id="score"></p>
+
                 </div>
             </div>
         </div>
     </div>
-    <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        let audioBlob;
+        <script>
+            let mediaRecorder;
+            let audioChunks = [];
+            let audioBlob;
 
-        document.getElementById('recordButton').onclick = async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            mediaRecorder.start();
+            document.getElementById('recordButton').onclick = async () => {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
 
-            mediaRecorder.ondataavailable = event => {
-                audioChunks.push(event.data);
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const formData = new FormData();
+                    formData.append('audio_data', audioBlob, 'recording.wav');
+                    formData.append('expected_letter', document.getElementById('expectedLetter').innerText);
+
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    document.getElementById('transcription').innerText = "Spoken letter: " + result.transcription;
+                    document.getElementById('score').innerText = "Letter recognition score: " + result.score;
+
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.getElementById('audioPlayback').src = audioUrl;
+
+                    audioChunks = [];
+                    document.getElementById('playButton').disabled = false;
+                };
+
+                document.getElementById('recordButton').disabled = true;
+                document.getElementById('stopButton').disabled = false;
             };
 
-            mediaRecorder.onstop = async () => {
-                audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const formData = new FormData();
-                formData.append('audio_data', audioBlob, 'recording.wav');
-
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                document.getElementById('transcription').innerText = result.transcription;
-
-                const audioUrl = URL.createObjectURL(audioBlob);
-                document.getElementById('audioPlayback').src = audioUrl;
-
-                audioChunks = [];
-                document.getElementById('playButton').disabled = false;
+            document.getElementById('stopButton').onclick = () => {
+                mediaRecorder.stop();
+                document.getElementById('recordButton').disabled = false;
+                document.getElementById('stopButton').disabled = true;
             };
 
-            document.getElementById('recordButton').disabled = true;
-            document.getElementById('stopButton').disabled = false;
-        };
-
-        document.getElementById('stopButton').onclick = () => {
-            mediaRecorder.stop();
-            document.getElementById('recordButton').disabled = false;
-            document.getElementById('stopButton').disabled = true;
-        };
-
-        document.getElementById('playButton').onclick = () => {
-            document.getElementById('audioPlayback').play();
-        };
-    </script>
+            document.getElementById('playButton').onclick = () => {
+                document.getElementById('audioPlayback').play();
+            };
+        </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"/>
 </body>
 </html>
