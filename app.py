@@ -1,8 +1,8 @@
 from flask import Flask, render_template, request, jsonify
 import os
+import random
 import speech_recognition as sr
 from pydub import AudioSegment
-import random
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -22,42 +22,47 @@ def calculate_letter_recognition_score(expected_letter, spoken_letter):
 
 @app.route('/')
 def index():
-    expected_letter = generate_random_letter()
-    return render_template('index.html', expected_letter=expected_letter)
+    expected_letters = [generate_random_letter() for _ in range(5)]
+    return render_template('index.html', expected_letters=expected_letters)
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    expected_letter = request.form['expected_letter']
-    if 'audio_data' in request.files:
-        audio_file = request.files['audio_data']
-        file_path = os.path.join(UPLOAD_FOLDER, audio_file.filename)
-        audio_file.save(file_path)
+    expected_letters = request.form.getlist('expected_letters[]')
+    total_score = 0.0
+    transcriptions = []
 
-        # Convert audio to PCM WAV format
-        audio = AudioSegment.from_file(file_path)
-        wav_path = file_path.replace('.webm', '.wav')
-        audio.export(wav_path, format='wav')
+    for i in range(5):
+        if f'audio_data_{i}' in request.files:
+            audio_file = request.files[f'audio_data_{i}']
+            file_path = os.path.join(UPLOAD_FOLDER, audio_file.filename)
+            audio_file.save(file_path)
 
-        # Recognize the audio
-        recognizer = sr.Recognizer()
-        with sr.AudioFile(wav_path) as source:
-            audio_data = recognizer.record(source)
-            try:
-                text = recognizer.recognize_google(audio_data)
-            except sr.UnknownValueError:
-                text = "Could not understand audio"
-            except sr.RequestError:
-                text = "Could not request results; check your network connection"
-        
-        score = calculate_letter_recognition_score(expected_letter, text)
+            # Convert audio to PCM WAV format
+            audio = AudioSegment.from_file(file_path)
+            wav_path = file_path.replace('.webm', '.wav')
+            audio.export(wav_path, format='wav')
 
-        return jsonify({
-            'message': 'Audio uploaded successfully',
-            'transcription': text,
-            'expected_letter': expected_letter,
-            'score': score
-        }), 200
-    return 'No audio file found', 400
+            # Recognize the audio
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(wav_path) as source:
+                audio_data = recognizer.record(source)
+                try:
+                    spoken_letter = recognizer.recognize_google(audio_data)
+                except sr.UnknownValueError:
+                    spoken_letter = ""
+                except sr.RequestError:
+                    spoken_letter = ""
+
+            score = calculate_letter_recognition_score(expected_letters[i], spoken_letter)
+            total_score += score
+            transcriptions.append(spoken_letter)
+
+    return jsonify({
+        'message': 'Audio uploaded successfully',
+        'transcriptions': transcriptions,
+        'expected_letters': expected_letters,
+        'total_score': total_score
+    }), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
