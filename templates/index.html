@@ -28,6 +28,20 @@
             <button id="submitButton" class="btn btn-success" style="display: none;" disabled>Submit</button>
             <p id="totalScore" class="font-weight-bold mt-3"></p>
         </div>
+        <div id="results" class="mt-5" style="display: none;">
+            <h2 class="text-center">Results</h2>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Test #</th>
+                        <th>Expected Letter</th>
+                        <th>Spoken Letter</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody">
+                </tbody>
+            </table>
+        </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
@@ -118,6 +132,20 @@
                 document.querySelectorAll('.transcription')[index].innerText = "Spoken letter: " + transcription;
             });
             document.getElementById('totalScore').innerText = "Total score: " + result.total_score;
+
+            // Display results
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            resultsTableBody.innerHTML = '';
+            result.expected_letters.forEach((expected, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${expected}</td>
+                    <td>${result.transcriptions[index]}</td>
+                `;
+                resultsTableBody.appendChild(row);
+            });
+            document.getElementById('results').style.display = 'block';
         };
     </script>
 </body>
