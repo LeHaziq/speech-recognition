@@ -9,7 +9,9 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def generate_random_letter():
-    return random.choice('abcdefghijklmnopqrstuvwxyz')
+    letters = 'abcdefghijklmnopqrstuvwxyz'
+    words = ["apple", "green", "one", "two", "white", "house", "mountian", "brilliant", "chair", "table", "water"]
+    return random.choice(words)
 
 def calculate_letter_recognition_score(expected_letter, spoken_letter):
     expected_letter = expected_letter.lower()
