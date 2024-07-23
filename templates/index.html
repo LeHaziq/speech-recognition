@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Record Audio</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .recording-indicator {
+            display: none;
+            color: red;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
@@ -16,13 +23,15 @@
             <p>Welcome, <strong>{{ username }}</strong>! Age: <strong>{{ age }}</strong></p>
             <a href="/score_history" class="btn btn-info">View Score History</a>
         </div>
+        <div class="text-center mb-4">
+            <p>Press and hold the <strong>Spacebar</strong> to record your audio.</p>
+            <p class="recording-indicator">Recording...</p>
+        </div>
         <div id="tests">
             {% for i in range(5) %}
             <div class="test card mb-4" style="display: none;">
                 <div class="card-body">
                     <p>Expected letter {{ i+1 }}: <span class="expectedLetter" style="font-size: 2em; font-weight: bold;">{{ expected_letters[i] }}</span></p>
-                    <button class="btn btn-primary recordButton" data-index="{{ i }}">Record</button>
-                    <button class="btn btn-secondary stopButton" data-index="{{ i }}" disabled>Stop</button>
                     <button class="btn btn-info playButton" data-index="{{ i }}" disabled>Play</button>
                     <audio class="audioPlayback mt-3 w-100" controls></audio>
                     <p class="transcription mt-2"></p>
@@ -55,12 +64,14 @@
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         let currentTest = 0;
-        let mediaRecorders = [];
-        let audioChunks = Array.from({ length: 5 }, () => []);
-        let audioBlobs = [];
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlobs = Array(5).fill(null);
 
         document.addEventListener('DOMContentLoaded', () => {
             showTest(currentTest);
+            document.addEventListener('keydown', handleKeyDown);
+            document.addEventListener('keyup', handleKeyUp);
         });
 
         function showTest(index) {
@@ -78,38 +89,38 @@
             }
         };
 
-        document.querySelectorAll('.recordButton').forEach((button, index) => {
-            button.onclick = async () => {
+        async function handleKeyDown(event) {
+            if (event.code === 'Space' && !mediaRecorder) {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorders[index] = new MediaRecorder(stream);
-                mediaRecorders[index].start();
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
 
-                mediaRecorders[index].ondataavailable = event => {
-                    audioChunks[index].push(event.data);
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
                 };
 
-                mediaRecorders[index].onstop = () => {
-                    audioBlobs[index] = new Blob(audioChunks[index], { type: 'audio/wav' });
-                    const audioUrl = URL.createObjectURL(audioBlobs[index]);
-                    document.querySelectorAll('.audioPlayback')[index].src = audioUrl;
+                document.querySelector('.recording-indicator').style.display = 'block';
+            }
+        }
 
-                    audioChunks[index] = [];
-                    document.querySelectorAll('.playButton')[index].disabled = false;
+        function handleKeyUp(event) {
+            if (event.code === 'Space' && mediaRecorder) {
+                mediaRecorder.stop();
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioBlobs[currentTest] = audioBlob;
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    document.querySelectorAll('.audioPlayback')[currentTest].src = audioUrl;
+
+                    audioChunks = [];
+                    document.querySelectorAll('.playButton')[currentTest].disabled = false;
                     checkAllRecorded();
+                    mediaRecorder = null;
                 };
 
-                button.disabled = true;
-                document.querySelectorAll('.stopButton')[index].disabled = false;
-            };
-        });
-
-        document.querySelectorAll('.stopButton').forEach((button, index) => {
-            button.onclick = () => {
-                mediaRecorders[index].stop();
-                document.querySelectorAll('.recordButton')[index].disabled = false;
-                button.disabled = true;
-            };
-        });
+                document.querySelector('.recording-indicator').style.display = 'none';
+            }
+        }
 
         document.querySelectorAll('.playButton').forEach((button, index) => {
             button.onclick = () => {
@@ -118,7 +129,7 @@
         });
 
         function checkAllRecorded() {
-            const allRecorded = audioBlobs.length === 5 && audioBlobs.every(blob => blob);
+            const allRecorded = audioBlobs.every(blob => blob !== null);
             document.getElementById('submitButton').disabled = !allRecorded;
         }
 
