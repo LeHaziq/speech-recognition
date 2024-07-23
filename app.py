@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, login_user, login_required, logout_user, current_user
+from models import db, User, Score
 import os
 import random
 import speech_recognition as sr
@@ -14,23 +14,16 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Initialize SQLAlchemy
-db = SQLAlchemy(app)
+db.init_app(app)
 
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# User model
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(150), unique=True, nullable=False)
-    password = db.Column(db.String(150), nullable=False)
-    age = db.Column(db.Integer, nullable=False)
-
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 def generate_random_letter():
     letters = 'abcdefghijklmnopqrstuvwxyz'
@@ -63,7 +56,7 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
+    if request.method == ['POST']:
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
@@ -83,7 +76,7 @@ def logout():
 @login_required
 def index():
     expected_letters = [generate_random_letter() for _ in range(5)]
-    return render_template('index.html', expected_letters=expected_letters)
+    return render_template('index.html', expected_letters=expected_letters, username=current_user.username, age=current_user.age)
 
 @app.route('/upload', methods=['POST'])
 @login_required
@@ -117,6 +110,11 @@ def upload():
             score = calculate_letter_recognition_score(expected_letters[i], spoken_letter)
             total_score += score
             transcriptions.append(spoken_letter)
+
+    # Save the score to the database
+    new_score = Score(user_id=current_user.id, score=total_score)
+    db.session.add(new_score)
+    db.session.commit()
 
     return jsonify({
         'message': 'Audio uploaded successfully',
