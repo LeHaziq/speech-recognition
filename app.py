@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_sqlalchemy import SQLAlchemy
 import os
 import random
 import speech_recognition as sr
@@ -7,26 +8,29 @@ from pydub import AudioSegment
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a random secret key
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Initialize SQLAlchemy
+db = SQLAlchemy(app)
 
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# In-memory user storage for demonstration purposes
-users = {}
-
-class User(UserMixin):
-    def __init__(self, id):
-        self.id = id
+# User model
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), unique=True, nullable=False)
+    password = db.Column(db.String(150), nullable=False)
+    age = db.Column(db.Integer, nullable=False)
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id in users:
-        return User(user_id)
-    return None
+    return User.query.get(int(user_id))
 
 def generate_random_letter():
     letters = 'abcdefghijklmnopqrstuvwxyz'
@@ -47,11 +51,13 @@ def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if username in users:
+        age = request.form['age']
+        if User.query.filter_by(username=username).first():
             return 'Username already exists', 400
-        users[username] = {'password': password}
-        user = User(username)
-        login_user(user)
+        new_user = User(username=username, password=password, age=age)
+        db.session.add(new_user)
+        db.session.commit()
+        login_user(new_user)
         return redirect(url_for('index'))
     return render_template('register.html')
 
@@ -60,8 +66,8 @@ def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        if username in users and users[username]['password'] == password:
-            user = User(username)
+        user = User.query.filter_by(username=username).first()
+        if user and user.password == password:
             login_user(user)
             return redirect(url_for('index'))
         return 'Invalid credentials', 401
@@ -120,4 +126,6 @@ def upload():
     }), 200
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
