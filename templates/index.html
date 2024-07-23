@@ -14,6 +14,7 @@
         </div>
         <div class="text-center mb-4">
             <p>Welcome, <strong>{{ username }}</strong>! Age: <strong>{{ age }}</strong></p>
+            <a href="/score_history" class="btn btn-info">View Score History</a>
         </div>
         <div id="tests">
             {% for i in range(5) %}
@@ -128,30 +129,38 @@
                 formData.append(`audio_data_${index}`, audioBlobs[index], `recording_${index}.wav`);
             });
 
-            const response = await fetch('/upload', {
-                method: 'POST',
-                body: formData
-            });
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            const result = await response.json();
-            result.transcriptions.forEach((transcription, index) => {
-                document.querySelectorAll('.transcription')[index].innerText = "Spoken letter: " + transcription;
-            });
-            document.getElementById('totalScore').innerText = "Total score: " + result.total_score;
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
 
-            // Display results
-            const resultsTableBody = document.getElementById('resultsTableBody');
-            resultsTableBody.innerHTML = '';
-            result.expected_letters.forEach((expected, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${expected}</td>
-                    <td>${result.transcriptions[index]}</td>
-                `;
-                resultsTableBody.appendChild(row);
-            });
-            document.getElementById('results').style.display = 'block';
+                const result = await response.json();
+                result.transcriptions.forEach((transcription, index) => {
+                    document.querySelectorAll('.transcription')[index].innerText = "Spoken letter: " + transcription;
+                });
+                document.getElementById('totalScore').innerText = "Total score: " + result.total_score;
+
+                // Display results
+                const resultsTableBody = document.getElementById('resultsTableBody');
+                resultsTableBody.innerHTML = '';
+                result.expected_letters.forEach((expected, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${index + 1}</td>
+                        <td>${expected}</td>
+                        <td>${result.transcriptions[index]}</td>
+                    `;
+                    resultsTableBody.appendChild(row);
+                });
+                document.getElementById('results').style.display = 'block';
+            } catch (error) {
+                console.error('Error:', error);
+            }
         };
     </script>
 </body>

@@ -56,7 +56,7 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == ['POST']:
+    if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
@@ -122,6 +122,12 @@ def upload():
         'expected_letters': expected_letters,
         'total_score': total_score
     }), 200
+
+@app.route('/score_history')
+@login_required
+def score_history():
+    scores = Score.query.filter_by(user_id=current_user.id).all()
+    return render_template('score_history.html', scores=scores)
 
 if __name__ == '__main__':
     with app.app_context():
